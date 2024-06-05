@@ -98,7 +98,7 @@ namespace SuperUnityBuild.BuildTool
 
         #endregion
 
-        public void Draw(SerializedObject obj)
+        public virtual void Draw(SerializedObject obj)
         {
             EditorGUILayout.BeginVertical(UnityBuildGUIUtility.dropdownContentStyle);
 
