@@ -1,5 +1,7 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using UnityEditor;
+using UnityEngine;
 
 namespace SuperUnityBuild.BuildTool
 {
@@ -47,6 +49,84 @@ namespace SuperUnityBuild.BuildTool
             }
 
             configSet = refreshedConfigSet;
+
+            SanityCheck(releaseTypes);
+        }
+
+        private static void SanityCheck(BuildReleaseType[] releaseTypes)
+        {
+            //for each release type (e.g. Internal) (there should only be one)
+            for (int i = 0; i < releaseTypes.Length; i++)
+            {
+                //this is just Internal or Release or whatever
+                string rootKey = releaseTypes[i].typeName;
+                Configuration rootConfig = BuildSettings.projectConfigurations.configSet[rootKey];
+
+                //for each platform...
+                for (int j = 0; j < rootConfig.childKeys.Length; j++)
+                {
+                    //we need some recursion to reach the bottom of the tree
+                    string secondaryKey = rootConfig.childKeys[j];
+                    Configuration secondaryConfig = BuildSettings.projectConfigurations.configSet[secondaryKey];
+
+                    int sanity = 0;
+                    while (secondaryConfig.childKeys.Length > 0)
+                    {
+                        secondaryKey = secondaryConfig.childKeys[0];
+                        secondaryConfig = BuildSettings.projectConfigurations.configSet[secondaryKey];
+
+                        //this must be the end of the tree
+                        if (secondaryConfig.childKeys == null)
+                            break;
+
+                        sanity++;
+                        if (sanity > 10)
+                        {
+                            Debug.LogError("baka");
+                            break;
+                        }
+                    }
+
+                    //if the bottom of the tree is enabled, then that's that
+                    if (secondaryConfig.enabled)
+                    {
+                        bool error = false;
+
+                        //the name is actually close to the root, not the bottom of the tree (that would be Mono)
+                        string activePlatformName = rootConfig.childKeys[j];
+
+                        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.Switch && !activePlatformName.Contains("/Nintendo Switch"))
+                        {
+                            error = true;
+                        }
+                        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.PS5 && !activePlatformName.Contains("/PlayStation 5"))
+                        {
+                            error = true;
+                        }
+                        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneLinux64 && !activePlatformName.Contains("/Linux"))
+                        {
+                            error = true;
+                        }
+                        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneWindows64 && !activePlatformName.Contains("/PC"))
+                        {
+                            error = true;
+                        }
+                        if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.StandaloneOSX && !activePlatformName.Contains("/macOS"))
+                        {
+                            error = true;
+                        }
+
+                        //MyPrint.Log("Unity build target: " + EditorUserBuildSettings.activeBuildTarget + "\nCurrent SuperUnityBuild: " + activePlatformName);
+
+                        if (error)
+                        {
+                            MyPrint.LogError("SuperUnityBuild's current target is " + activePlatformName + "\n" +
+                                "Unity's build target is " + EditorUserBuildSettings.activeBuildTarget + "\n" +
+                                "You must change Unity's build target to match, otherwise the addressables will fail!");
+                        }
+                    }
+                }
+            }
         }
 
         public string[] BuildAllKeychains()
